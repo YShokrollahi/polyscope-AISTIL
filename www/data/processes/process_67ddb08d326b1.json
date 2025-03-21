@@ -1,0 +1,22 @@
+{
+    "id": "process_67ddb08d326b1",
+    "action": "multizoom",
+    "files": [
+        "\/Users\/yshokrollahi\/Documents\/GitHub\/polyscope-AISTIL\/www\/api\/..\/output\/Screenshot 2025-03-19 at 4.42.19\u202fPM\/Screenshot 2025-03-19 at 4.42.19\u202fPM_deepzoom.dzi"
+    ],
+    "project_id": null,
+    "status": "completed",
+    "progress": 100,
+    "total_files": 1,
+    "processed_files": 0,
+    "started": 1742581901,
+    "updated": 1742581901,
+    "completed": 1742581901,
+    "results": [
+        {
+            "htmlPath": "\/Users\/yshokrollahi\/Documents\/GitHub\/polyscope-AISTIL\/www\/api\/..\/output\/multizoom\/index.html",
+            "viewerCount": 1,
+            "title": "Multi-Zoom View"
+        }
+    ]
+}

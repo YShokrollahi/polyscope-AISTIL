@@ -1,4 +1,7 @@
 <?php
+// Remove execution time limit completely
+set_time_limit(0);
+
 /**
  * DZI Generator
  * Converts slides to Deep Zoom Image format using vips
@@ -38,16 +41,32 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
         mkdir($workingDir, 0755, true);
     }
     
+    // Initialize progress tracking
+    $progressFile = $workingDir . '/progress.json';
+    $progressData = [
+        'status' => 'initializing',
+        'percent' => 0,
+        'stage' => 'Starting process',
+        'message' => 'Preparing to process file',
+        'startTime' => microtime(true)
+    ];
+    file_put_contents($progressFile, json_encode($progressData, JSON_PRETTY_PRINT));
+    
     // Start logging
     $logFile = $workingDir . '/process.log';
     file_put_contents($logFile, "Processing file: $inputFile\n");
     file_put_contents($logFile, "Started: " . date('Y-m-d H:i:s') . "\n", FILE_APPEND);
+    
+    // Update progress
+    updateProgress($progressFile, 'checking', 5, 'Checking dependencies', 'Verifying vips installation');
     
     // Check if vips is installed
     exec('which vips', $whichOutput, $whichReturnCode);
     if ($whichReturnCode !== 0) {
         $errorMsg = "Error: vips command not found. Please install vips.";
         file_put_contents($logFile, $errorMsg . "\n", FILE_APPEND);
+        
+        updateProgress($progressFile, 'error', 100, 'Error', $errorMsg);
         
         $statusData = [
             'filename' => $filename,
@@ -68,6 +87,9 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
         return $statusData;
     }
     
+    // Update progress
+    updateProgress($progressFile, 'preparing', 10, 'Preparing conversion', 'Building vips command');
+    
     // Build the vips command
     $vipsCommand = "vips dzsave \"$inputFile\" \"$workingDir/{$baseFilename}\" " .
                    "--tile-size={$options['tileSize']} " .
@@ -78,10 +100,21 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
     // Log the command
     file_put_contents($logFile, "Command: $vipsCommand\n", FILE_APPEND);
     
+    // Update progress
+    updateProgress($progressFile, 'processing', 15, 'Processing image', 'Converting image to DZI format');
+    
+    // Set up a background process that periodically updates progress
+    $progressUpdaterPid = startProgressUpdater($workingDir, $baseFilename, $progressFile);
+    
     // Execute the command
     $startTime = microtime(true);
     exec($vipsCommand, $output, $returnCode);
     $endTime = microtime(true);
+    
+    // Stop the progress updater
+    if ($progressUpdaterPid) {
+        exec("kill $progressUpdaterPid 2>/dev/null");
+    }
     
     // Log the output and return code
     file_put_contents($logFile, "Return code: $returnCode\n", FILE_APPEND);
@@ -91,6 +124,8 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
     if ($returnCode !== 0) {
         $errorMsg = "Error: vips dzsave failed with code $returnCode";
         file_put_contents($logFile, $errorMsg . "\n", FILE_APPEND);
+        
+        updateProgress($progressFile, 'error', 100, 'Error', $errorMsg);
         
         $statusData = [
             'filename' => $filename,
@@ -112,6 +147,9 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
         return $statusData;
     }
     
+    // Update progress
+    updateProgress($progressFile, 'finishing', 85, 'Finalizing', 'Preparing viewer');
+    
     // Rename the output files to match our convention
     $dziIn = "$workingDir/$baseFilename.dzi";
     $filesIn = "$workingDir/{$baseFilename}_files";
@@ -123,6 +161,8 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
     } else {
         $errorMsg = "Error: DZI file not created at expected path: $dziIn";
         file_put_contents($logFile, $errorMsg . "\n", FILE_APPEND);
+        
+        updateProgress($progressFile, 'error', 100, 'Error', $errorMsg);
         
         $statusData = [
             'filename' => $filename,
@@ -147,12 +187,18 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
         rename($filesIn, $filesOut);
     }
     
+    // Update progress
+    updateProgress($progressFile, 'creating_viewer', 90, 'Creating viewer', 'Generating HTML viewer');
+    
     // Create an HTML viewer for this slide
     createViewer($dziOut, $workingDir, $baseFilename);
     
     // Log completion
     file_put_contents($logFile, "Completed: " . date('Y-m-d H:i:s') . "\n", FILE_APPEND);
     file_put_contents($logFile, "Processing time: " . round($endTime - $startTime, 2) . " seconds\n", FILE_APPEND);
+    
+    // Update progress to complete
+    updateProgress($progressFile, 'complete', 100, 'Complete', 'Processing completed successfully');
     
     // Create status file
     $statusData = [
@@ -168,6 +214,121 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
     file_put_contents("$workingDir/status.json", json_encode($statusData, JSON_PRETTY_PRINT));
     
     return $statusData;
+}
+
+/**
+ * Update the progress file with current status
+ * 
+ * @param string $progressFile Path to the progress file
+ * @param string $status Current status (initializing, processing, complete, error)
+ * @param int $percent Completion percentage (0-100)
+ * @param string $stage Current processing stage
+ * @param string $message Status message
+ */
+function updateProgress($progressFile, $status, $percent, $stage, $message) {
+    $progressData = [
+        'status' => $status,
+        'percent' => $percent,
+        'stage' => $stage,
+        'message' => $message,
+        'timestamp' => microtime(true)
+    ];
+    
+    file_put_contents($progressFile, json_encode($progressData, JSON_PRETTY_PRINT));
+}
+
+/**
+ * Start a background process that updates progress during long operations
+ * 
+ * @param string $workingDir Directory containing processing files
+ * @param string $baseFilename Base filename without extension
+ * @param string $progressFile Path to the progress file
+ * @return int|null Process ID of the background process or null on failure
+ */
+function startProgressUpdater($workingDir, $baseFilename, $progressFile) {
+    // Create a temp script that will monitor the progress
+    $scriptPath = $workingDir . '/progress_updater.php';
+    
+    $scriptContent = '<?php
+// This is a background progress updater
+set_time_limit(0);
+
+$workingDir = ' . var_export($workingDir, true) . ';
+$baseFilename = ' . var_export($baseFilename, true) . ';
+$progressFile = ' . var_export($progressFile, true) . ';
+
+// Get initial progress data
+$progressData = json_decode(file_get_contents($progressFile), true);
+$startPercent = $progressData["percent"] ?? 15;
+
+// Check for DZI files directory as a progress indicator
+$filesDir = "$workingDir/{$baseFilename}_files";
+if (!file_exists($filesDir)) {
+    $filesDir = "$workingDir/{$baseFilename}_deepzoom_files";
+}
+
+// Run for about 5 minutes max (300 seconds)
+$timeout = time() + 300;
+$lastUpdate = time();
+
+while (time() < $timeout) {
+    // Sleep for a bit to reduce CPU usage
+    sleep(2);
+    
+    // Check if the progress file still exists (process might be done)
+    if (!file_exists($progressFile)) {
+        break;
+    }
+    
+    // Read current progress
+    $progressData = json_decode(file_get_contents($progressFile), true);
+    
+    // If status is complete or error, exit
+    if (in_array($progressData["status"], ["complete", "error"])) {
+        break;
+    }
+    
+    // Increment the percent over time to show progress
+    // This is an approximation since we can\'t easily get progress from vips
+    $elapsedTime = time() - $lastUpdate;
+    $newPercent = min($progressData["percent"] + ($elapsedTime * 0.1), 80);
+    
+    // Update progress file if directories are being created
+    if (file_exists($filesDir)) {
+        // Count number of zoom level directories as a rough progress indicator
+        $zoomLevels = glob("$filesDir/*", GLOB_ONLYDIR);
+        $levelCount = count($zoomLevels);
+        
+        if ($levelCount > 0) {
+            // Use zoom levels to estimate progress
+            // Max is typically around 12-15 levels for large images
+            $maxLevels = 15;
+            $estimatedPercent = 15 + (min($levelCount, $maxLevels) / $maxLevels * 65);
+            $newPercent = max($newPercent, $estimatedPercent);
+        }
+    }
+    
+    // Update progress
+    $progressData["percent"] = min(round($newPercent), 80); // Cap at 80%
+    $progressData["message"] = "Creating image pyramid (approx. " . $progressData["percent"] . "%)";
+    $progressData["timestamp"] = microtime(true);
+    
+    file_put_contents($progressFile, json_encode($progressData, JSON_PRETTY_PRINT));
+    $lastUpdate = time();
+}
+';
+    
+    file_put_contents($scriptPath, $scriptContent);
+    
+    // Start background process
+    $command = "php -f $scriptPath > /dev/null 2>&1 & echo $!";
+    exec($command, $output);
+    
+    if (isset($output[0]) && is_numeric($output[0])) {
+        return $output[0]; // Return the process ID
+    }
+    
+    return null;
 }
 
 /**

@@ -1,4 +1,4 @@
-# polyscope-AISTIL
+<<<<<<< HEAD
 # Polyscope-AISTIL
 
 AI-Polyscope is a lightweight web-based viewer for large pathology slides with AI annotations and segmentation overlays. It converts slides to Deep Zoom Image (DZI) format and provides synchronizable multi-view capabilities.
@@ -97,6 +97,15 @@ polyscope-AISTIL/
 - Multiple slides can be viewed side-by-side in a synchronized interface.  
 - The **"Sync Views Now"** button aligns all viewers to the same position and zoom level.  
 
+## Usage
+
+### Running the Web Interface
+
+Start the PHP development server:
+```bash
+php -S localhost:8000 -t www/
+```
+
 ## Troubleshooting
 
 - **Missing vips:** Make sure `vips` is installed and available in your `PATH`.  
@@ -112,3 +121,6 @@ MIT
 - [OpenSeadragon](https://openseadragon.github.io/) for the deep zoom viewer.  
 - [vips](https://libvips.github.io/libvips/) for fast image processing.
 
+=======
+# polyscope-AISTIL
+>>>>>>> parent of e225dd0 (readme)
