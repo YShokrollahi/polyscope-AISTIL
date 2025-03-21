@@ -1,4 +1,0 @@
-* * * * * /var/www/executeSupervisor.sh
-* * * * * ( sleep 30; /var/www/executeSupervisor.sh )
-* * * * * ( sleep 15; /var/www/executeAnalysisSupervisor.sh )
-* * * * * ( sleep 45; /var/www/executeAnalysisSupervisor.sh )

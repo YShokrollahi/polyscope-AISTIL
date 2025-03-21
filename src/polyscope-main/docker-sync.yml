@@ -1,8 +1,0 @@
-version: '2'
-syncs:
-  polyscope-sync:
-    src: './src/polyscope-main'
-    sync_userid: '504'
-    sync_strategy: 'unison'
-    max_attempt: 100
-    max_inital_sync_retries: 10
