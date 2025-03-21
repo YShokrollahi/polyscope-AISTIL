@@ -1,0 +1,39 @@
+Processing file: /Users/yshokrollahi/Documents/GitHub/polyscope-AISTIL/www/../input/working.tif
+Started: 2025-03-21 21:41:00
+Command: vips dzsave "/Users/yshokrollahi/Documents/GitHub/polyscope-AISTIL/www/../input/working.tif" "/Users/yshokrollahi/Documents/GitHub/polyscope-AISTIL/www/api/../output/working/working" --tile-size=254 --overlap=1 --suffix=.jpg[Q=90] 2>> "/Users/yshokrollahi/Documents/GitHub/polyscope-AISTIL/www/api/../output/working/process.log"
+
+(vips:68248): VIPS-WARNING **: 16:41:00.466: Unknown field with tag 50838 (0xc696) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.467: Unknown field with tag 50839 (0xc697) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.467: Unknown field with tag 50838 (0xc696) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.467: Unknown field with tag 50839 (0xc697) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.467: Unknown field with tag 50838 (0xc696) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.467: Unknown field with tag 50839 (0xc697) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.467: Unknown field with tag 50838 (0xc696) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.467: Unknown field with tag 50839 (0xc697) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.467: Unknown field with tag 50838 (0xc696) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.467: Unknown field with tag 50839 (0xc697) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.468: Unknown field with tag 50838 (0xc696) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.468: Unknown field with tag 50839 (0xc697) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.468: Unknown field with tag 50838 (0xc696) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.468: Unknown field with tag 50839 (0xc697) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.468: Unknown field with tag 50838 (0xc696) encountered
+
+(vips:68248): VIPS-WARNING **: 16:41:00.468: Unknown field with tag 50839 (0xc697) encountered
+Return code: 0
+Output: 
+Completed: 2025-03-21 21:41:00
+Processing time: 0.31 seconds

@@ -1,0 +1,11 @@
+{
+    "title": "Multi-Zoom View",
+    "syncViews": true,
+    "viewers": [
+        {
+            "id": "viewer1",
+            "name": "working",
+            "path": "..\/working\/working_deepzoom.dzi"
+        }
+    ]
+}

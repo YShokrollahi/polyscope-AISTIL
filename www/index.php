@@ -1,286 +1,200 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>AI-Polyscope Dashboard</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-        .section {
-            margin-bottom: 30px;
-        }
-        .card {
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 15px;
-            margin-bottom: 15px;
-            background-color: white;
-        }
-        .button {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 4px;
-        }
-        .file-list {
-            list-style-type: none;
-            padding: 0;
-        }
-        .file-item {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        .file-item:hover {
-            background-color: #f9f9f9;
-        }
-        .status-success {
-            color: green;
-        }
-        .status-error {
-            color: red;
-        }
-        .status-pending {
-            color: orange;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>AI-Polyscope Dashboard</h1>
-        
-        <div class="section">
-            <h2>Input Files</h2>
-            <div class="card">
-                <p>Select files to process:</p>
-                <div class="file-list">
-                    <?php
-                    $inputDir = __DIR__ . '/../input';
-                    $files = glob($inputDir . '/*.*');
-                    
-                    echo "<!-- Debug: Input dir = $inputDir -->";
-                    echo "<!-- Debug: Current dir = " . getcwd() . " -->";
-                    echo "<!-- Debug: Files found = " . count($files) . " -->";
-                    
-                    if (empty($files)) {
-                        echo "<p>No files found in input directory. Please add files to the 'input' folder.</p>";
-                        echo "<p>Looking in: " . realpath($inputDir) . "</p>";
-                    } else {
-                        echo "<ul class='file-list'>";
-                        foreach ($files as $file) {
-                            $filename = basename($file);
-                            echo "<li class='file-item'>";
-                            echo "<input type='checkbox' name='files[]' value='$file' id='$filename'>";
-                            echo "<label for='$filename'> $filename</label>";
-                            echo "</li>";
-                        }
-                        echo "</ul>";
-                        echo "<button class='button' onclick='processSelected()'>Process Selected Files</button>";
-                    }
-                    ?>
+<?php
+/**
+ * AI-Polyscope Dashboard - Main Page
+ * Enhanced UI version with modern styling
+ */
+
+// Initialize any variables
+$flashMessage = null;
+
+// Include header
+include_once __DIR__ . '/templates/header.php';
+?>
+
+<div class="dashboard-content">
+    <!-- Input Files Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-file-upload"></i> Input Files</h2>
+            <div class="actions">
+                <label for="select-all" class="button button-small">
+                    <input type="checkbox" id="select-all"> Select All
+                </label>
+            </div>
+        </div>
+        <div class="card-body">
+            <?php
+            $inputDir = __DIR__ . '/../input';
+            $files = glob($inputDir . '/*.*');
+            
+            if (empty($files)) {
+                ?>
+                <div class="empty-state">
+                    <i class="fas fa-upload"></i>
+                    <p>No files found in input directory.</p>
+                    <p class="small">Looking in: <?php echo realpath($inputDir); ?></p>
                 </div>
-            </div>
-        </div>
-        
-        <div class="section">
-            <h2>Processed Slides</h2>
-            <div class="card">
                 <?php
-                $outputDir = __DIR__ . '/output';
-                $processedDirs = glob($outputDir . '/*', GLOB_ONLYDIR);
-                
-                echo "<!-- Debug: Output dir = $outputDir -->";
-                echo "<!-- Debug: Processed dirs = " . count($processedDirs) . " -->";
-                
-                if (empty($processedDirs)) {
-                    echo "<p>No processed slides found. Process slides to see them here.</p>";
-                } else {
-                    echo "<ul class='file-list'>";
-                    foreach ($processedDirs as $dir) {
-                        $dirname = basename($dir);
-                        $statusFile = "$dir/status.json";
-                        $status = "unknown";
-                        $viewerPath = "";
-                        
-                        if (file_exists($statusFile)) {
-                            $statusData = json_decode(file_get_contents($statusFile), true);
-                            $status = $statusData['status'] ?? 'unknown';
-                            $viewerPath = $statusData['viewerPath'] ?? '';
-                        }
-                        
-                        $statusClass = '';
-                        switch ($status) {
-                            case 'success':
-                                $statusClass = 'status-success';
-                                break;
-                            case 'error':
-                                $statusClass = 'status-error';
-                                break;
-                            default:
-                                $statusClass = 'status-pending';
-                        }
-                        
-                        echo "<li class='file-item'>";
-                        echo "$dirname - <span class='$statusClass'>$status</span>";
-                        
-                        if ($status == 'success' && !empty($viewerPath)) {
-                            $relativeViewerPath = str_replace(__DIR__ . '/', '', $viewerPath);
-                            echo " <a href='$relativeViewerPath' target='_blank'>View</a>";
-                        }
-                        
-                        echo "</li>";
-                    }
-                    echo "</ul>";
-                }
-                ?>
-                
-                <?php if (!empty($processedDirs)): ?>
-                <button class='button' onclick='createMultizoom()'>Create Multi-Zoom View</button>
-                <?php endif; ?>
-            </div>
-        </div>
-        
-        <div class="section">
-            <h2>Multi-Zoom Views</h2>
-            <div class="card">
-                <?php
-                $multizoomDir = __DIR__ . '/output/multizoom';
-                
-                echo "<!-- Debug: Multizoom dir = $multizoomDir -->";
-                
-                if (is_dir($multizoomDir)) {
-                    $multizoomFiles = glob($multizoomDir . '/*.html');
+            } else {
+                echo '<ul class="file-list">';
+                foreach ($files as $file) {
+                    $filename = basename($file);
+                    $fileExt = pathinfo($filename, PATHINFO_EXTENSION);
+                    $fileIcon = 'file';
                     
-                    if (empty($multizoomFiles)) {
-                        echo "<p>No multi-zoom views found. Create a multi-zoom view to see it here.</p>";
-                    } else {
-                        echo "<ul class='file-list'>";
-                        foreach ($multizoomFiles as $file) {
-                            $filename = basename($file);
-                            $relativePath = str_replace(__DIR__ . '/', '', $file);
-                            echo "<li class='file-item'>";
-                            echo "<a href='$relativePath' target='_blank'>$filename</a>";
-                            echo "</li>";
-                        }
-                        echo "</ul>";
+                    // Set icon based on file type
+                    if (in_array(strtolower($fileExt), ['jpg', 'jpeg', 'png', 'gif', 'tiff', 'bmp'])) {
+                        $fileIcon = 'file-image';
+                    } elseif (in_array(strtolower($fileExt), ['pdf'])) {
+                        $fileIcon = 'file-pdf';
+                    } elseif (in_array(strtolower($fileExt), ['doc', 'docx'])) {
+                        $fileIcon = 'file-word';
                     }
-                } else {
-                    echo "<p>No multi-zoom views found. Create a multi-zoom view to see it here.</p>";
+                    
+                    echo '<li class="file-item">';
+                    echo '<input type="checkbox" name="files[]" value="' . $file . '" id="' . $filename . '">';
+                    echo '<label for="' . $filename . '"><i class="fas fa-' . $fileIcon . '"></i> ' . $filename . '</label>';
+                    echo '</li>';
                 }
-                ?>
-            </div>
+                echo '</ul>';
+                echo '<div style="text-align: right; margin-top: 1rem;">';
+                echo '<button class="button button-success" onclick="processSelected()"><i class="fas fa-cogs"></i> Process Selected Files</button>';
+                echo '</div>';
+            }
+            ?>
         </div>
     </div>
-    
-    <script>
-        function processSelected() {
-            const checkboxes = document.querySelectorAll('input[name="files[]"]:checked');
-            const files = Array.from(checkboxes).map(cb => cb.value);
-            
-            if (files.length === 0) {
-                alert('Please select at least one file to process.');
-                return;
-            }
-            
-            if (confirm('Process ' + files.length + ' selected files?')) {
-                // Show a processing message
-                const processingDiv = document.createElement('div');
-                processingDiv.id = 'processing-message';
-                processingDiv.style.position = 'fixed';
-                processingDiv.style.top = '50%';
-                processingDiv.style.left = '50%';
-                processingDiv.style.transform = 'translate(-50%, -50%)';
-                processingDiv.style.padding = '20px';
-                processingDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-                processingDiv.style.color = 'white';
-                processingDiv.style.borderRadius = '5px';
-                processingDiv.style.zIndex = '1000';
-                processingDiv.innerHTML = '<p>Processing files... Please wait.</p>';
-                document.body.appendChild(processingDiv);
-                
-                // Create a form for POST submission
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = 'api/process.php';
-                form.style.display = 'none';
-                
-                // Add files as input
-                const filesInput = document.createElement('input');
-                filesInput.type = 'hidden';
-                filesInput.name = 'files';
-                filesInput.value = JSON.stringify(files);
-                form.appendChild(filesInput);
-                
-                // Add action as input
-                const actionInput = document.createElement('input');
-                actionInput.type = 'hidden';
-                actionInput.name = 'action';
-                actionInput.value = 'process';
-                form.appendChild(actionInput);
-                
-                // Append form to body and submit
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
 
-        function createMultizoom() {
-            if (confirm('Create a multi-zoom view of all processed slides?')) {
-                // Show a processing message
-                const processingDiv = document.createElement('div');
-                processingDiv.id = 'processing-message';
-                processingDiv.style.position = 'fixed';
-                processingDiv.style.top = '50%';
-                processingDiv.style.left = '50%';
-                processingDiv.style.transform = 'translate(-50%, -50%)';
-                processingDiv.style.padding = '20px';
-                processingDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-                processingDiv.style.color = 'white';
-                processingDiv.style.borderRadius = '5px';
-                processingDiv.style.zIndex = '1000';
-                processingDiv.innerHTML = '<p>Creating multi-zoom view... Please wait.</p>';
-                document.body.appendChild(processingDiv);
+    <!-- Processed Slides Section -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-microscope"></i> Processed Slides</h2>
+            <div class="actions">
+                <button class="button button-small" id="refresh-slides">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <?php
+            $outputDir = __DIR__ . '/output';
+            $processedDirs = glob($outputDir . '/*', GLOB_ONLYDIR);
+            
+            if (empty($processedDirs)) {
+                ?>
+                <div class="empty-state">
+                    <i class="fas fa-microscope"></i>
+                    <p>No processed slides found.</p>
+                    <p class="small">Process slides to see them here.</p>
+                </div>
+                <?php
+            } else {
+                echo '<ul class="file-list">';
+                foreach ($processedDirs as $dir) {
+                    $dirname = basename($dir);
+                    $statusFile = "$dir/status.json";
+                    $status = "unknown";
+                    $viewerPath = "";
+                    
+                    if (file_exists($statusFile)) {
+                        $statusData = json_decode(file_get_contents($statusFile), true);
+                        $status = $statusData['status'] ?? 'unknown';
+                        $viewerPath = $statusData['viewerPath'] ?? '';
+                    }
+                    
+                    $statusClass = '';
+                    $statusIcon = '';
+                    switch ($status) {
+                        case 'success':
+                            $statusClass = 'status-success';
+                            $statusIcon = 'check-circle';
+                            break;
+                        case 'error':
+                            $statusClass = 'status-error';
+                            $statusIcon = 'times-circle';
+                            break;
+                        default:
+                            $statusClass = 'status-pending';
+                            $statusIcon = 'clock';
+                    }
+                    
+                    echo '<li class="file-item">';
+                    echo '<i class="fas fa-microscope"></i> ' . $dirname;
+                    echo ' <span class="status-badge ' . $statusClass . '"><i class="fas fa-' . $statusIcon . '"></i> ' . $status . '</span>';
+                    
+                    if ($status == 'success' && !empty($viewerPath)) {
+                        $relativeViewerPath = str_replace(__DIR__ . '/', '', $viewerPath);
+                        echo ' <a href="' . $relativeViewerPath . '" target="_blank" class="button button-small"><i class="fas fa-eye"></i> View</a>';
+                    }
+                    
+                    echo '</li>';
+                }
+                echo '</ul>';
                 
-                // Create a form for POST submission
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = 'api/process.php';
-                form.style.display = 'none';
-                
-                // Add action as input
-                const actionInput = document.createElement('input');
-                actionInput.type = 'hidden';
-                actionInput.name = 'action';
-                actionInput.value = 'multizoom';
-                form.appendChild(actionInput);
-                
-                // Append form to body and submit
-                document.body.appendChild(form);
-                form.submit();
+                echo '<div style="text-align: right; margin-top: 1rem;">';
+                echo '<button class="button button-primary" onclick="createMultizoom()"><i class="fas fa-object-group"></i> Create Multi-Zoom View</button>';
+                echo '</div>';
             }
-        }
-    </script>
-</body>
-</html>
+            ?>
+        </div>
+    </div>
+
+    <!-- Multi-Zoom Views Section -->
+    <div class="card full-width">
+        <div class="card-header">
+            <h2><i class="fas fa-layer-group"></i> Multi-Zoom Views</h2>
+        </div>
+        <div class="card-body">
+            <?php
+            $multizoomDir = __DIR__ . '/output/multizoom';
+            
+            if (!is_dir($multizoomDir) || empty(glob($multizoomDir . '/*.html'))) {
+                ?>
+                <div class="empty-state">
+                    <i class="fas fa-object-group"></i>
+                    <p>No multi-zoom views found.</p>
+                    <p class="small">Create a multi-zoom view to see it here.</p>
+                </div>
+                <?php
+            } else {
+                $multizoomFiles = glob($multizoomDir . '/*.html');
+                
+                echo '<ul class="file-list">';
+                foreach ($multizoomFiles as $file) {
+                    $filename = basename($file);
+                    $relativePath = str_replace(__DIR__ . '/', '', $file);
+                    $creationTime = date('M j, Y H:i', filemtime($file));
+                    
+                    echo '<li class="file-item">';
+                    echo '<i class="fas fa-file-code"></i> ' . $filename;
+                    echo ' <span style="color: #7f8c8d; margin-left: 10px; font-size: 0.8rem;">Created: ' . $creationTime . '</span>';
+                    echo ' <a href="' . $relativePath . '" target="_blank" class="button button-small"><i class="fas fa-external-link-alt"></i> Open</a>';
+                    echo '</li>';
+                }
+                echo '</ul>';
+            }
+            ?>
+        </div>
+    </div>
+</div>
+
+<!-- Processing Modal -->
+<div id="processing-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-cogs"></i> Processing Files</h3>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body" id="processing-items-container">
+            <!-- Processing items will be added here -->
+        </div>
+        <div class="modal-footer">
+            <button id="modal-close-btn" class="button">Close</button>
+        </div>
+    </div>
+</div>
+
+<?php
+// Include footer
+include_once __DIR__ . '/templates/footer.php';
+?>
