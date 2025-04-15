@@ -30,6 +30,12 @@ cd polyscope-AISTIL
 # Download OpenSeadragon (if required separately)
 ```
 
+
+## Process a group of slides (raw, classification, TME seg, QC) and create multi-zoom view
+```bash
+./scripts/process_slide_group.sh input/slide_folder www/output "Slide Analysis"
+```
+
 ## Processing Slides
 
 ### Using the Web Interface:
