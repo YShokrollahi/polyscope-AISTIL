@@ -17,7 +17,8 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
     $defaults = [
         'tileSize' => 254,
         'overlap' => 1,
-        'quality' => 90
+        'quality' => 90,
+        'debug' => false
     ];
     
     $options = array_merge($defaults, $options);
@@ -42,6 +43,14 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
     $logFile = $workingDir . '/process.log';
     file_put_contents($logFile, "Processing file: $inputFile\n");
     file_put_contents($logFile, "Started: " . date('Y-m-d H:i:s') . "\n", FILE_APPEND);
+    
+    // If debug mode is enabled, log additional information
+    if ($options['debug']) {
+        file_put_contents($logFile, "Debug mode enabled\n", FILE_APPEND);
+        file_put_contents($logFile, "File exists: " . (file_exists($inputFile) ? 'yes' : 'no') . "\n", FILE_APPEND);
+        file_put_contents($logFile, "File size: " . (file_exists($inputFile) ? filesize($inputFile) . ' bytes' : 'N/A') . "\n", FILE_APPEND);
+        file_put_contents($logFile, "File type: " . $extension . "\n", FILE_APPEND);
+    }
     
     // Check if vips is installed
     exec('which vips', $whichOutput, $whichReturnCode);
@@ -68,19 +77,64 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
         return $statusData;
     }
     
-    // Build the vips command
-    $vipsCommand = "vips dzsave \"$inputFile\" \"$workingDir/{$baseFilename}\" " .
-                   "--tile-size={$options['tileSize']} " .
-                   "--overlap={$options['overlap']} " .
-                   "--suffix=.jpg[Q={$options['quality']}] " .
-                   "2>> \"$logFile\"";
-    
-    // Log the command
-    file_put_contents($logFile, "Command: $vipsCommand\n", FILE_APPEND);
-    
-    // Execute the command
+    // Special handling for different file types
+    $vipsCommand = "";
     $startTime = microtime(true);
-    exec($vipsCommand, $output, $returnCode);
+    
+    // For TIFF files, try both approaches
+    if (strtolower($extension) === 'tif' || strtolower($extension) === 'tiff') {
+        file_put_contents($logFile, "Using special handling for TIFF file\n", FILE_APPEND);
+        
+        // First try with direct dzsave
+        $vipsCommand = "vips dzsave \"$inputFile\" \"$workingDir/{$baseFilename}\" " .
+                       "--tile-size={$options['tileSize']} " .
+                       "--overlap={$options['overlap']} " .
+                       "--suffix=.jpg[Q={$options['quality']}] " .
+                       "2>> \"$logFile\"";
+        
+        file_put_contents($logFile, "First attempt command: $vipsCommand\n", FILE_APPEND);
+        exec($vipsCommand, $output, $returnCode);
+        
+        // If first approach fails, try converting to PNG first
+        if ($returnCode !== 0) {
+            file_put_contents($logFile, "First attempt failed with code $returnCode. Trying alternative approach...\n", FILE_APPEND);
+            
+            // Create a temporary PNG file
+            $tempPngFile = "$workingDir/{$baseFilename}_temp.png";
+            $convertCommand = "vips copy \"$inputFile\" \"$tempPngFile\" 2>> \"$logFile\"";
+            
+            file_put_contents($logFile, "Converting to PNG first: $convertCommand\n", FILE_APPEND);
+            exec($convertCommand, $convertOutput, $convertReturnCode);
+            
+            if ($convertReturnCode === 0 && file_exists($tempPngFile)) {
+                // Now try to create DZI from the PNG
+                $vipsCommand = "vips dzsave \"$tempPngFile\" \"$workingDir/{$baseFilename}\" " .
+                               "--tile-size={$options['tileSize']} " .
+                               "--overlap={$options['overlap']} " .
+                               "--suffix=.jpg[Q={$options['quality']}] " .
+                               "2>> \"$logFile\"";
+                
+                file_put_contents($logFile, "Second attempt command: $vipsCommand\n", FILE_APPEND);
+                exec($vipsCommand, $output, $returnCode);
+                
+                // Clean up temporary file
+                if (file_exists($tempPngFile)) {
+                    unlink($tempPngFile);
+                }
+            }
+        }
+    } else {
+        // Standard approach for other file types
+        $vipsCommand = "vips dzsave \"$inputFile\" \"$workingDir/{$baseFilename}\" " .
+                       "--tile-size={$options['tileSize']} " .
+                       "--overlap={$options['overlap']} " .
+                       "--suffix=.jpg[Q={$options['quality']}] " .
+                       "2>> \"$logFile\"";
+        
+        file_put_contents($logFile, "Standard command: $vipsCommand\n", FILE_APPEND);
+        exec($vipsCommand, $output, $returnCode);
+    }
+    
     $endTime = microtime(true);
     
     // Log the output and return code
