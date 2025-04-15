@@ -33,8 +33,19 @@ cd polyscope-AISTIL
 
 ## Process a group of slides (raw, classification, TME seg, QC) and create multi-zoom view
 ```bash
+# Process a group of slides (raw, classification, TME seg, QC) and create multi-zoom view
 ./scripts/process_slide_group.sh input/slide_folder www/output "Slide Analysis"
+
+# The final output will generate a URL like:
+# http://localhost:8000/output/slide_folder/multizoom/index.html
 ```
+### This command will:
+
+1. Take a folder containing all your slide files (raw SVS, classification TIFF, TME segmentation, and QC images)
+2. Process each file to create DZI versions
+3. Generate a multi-zoom view that shows all 4 images in a 2x2 layout
+4. Return a URL where you can access the multi-zoom view
+
 
 ## Processing Slides
 
