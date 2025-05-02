@@ -92,16 +92,57 @@ function ensureOpenSeadragonAvailable($outputDir) {
         mkdir($imagesDir, 0755, true);
     }
     
-    // Copy OpenSeadragon JS if it doesn't exist
-    $sourceJsFile = __DIR__ . '/../../www/js/openseadragon.min.js';
-    $destJsFile = $jsDir . '/openseadragon.min.js';
-    if (!file_exists($destJsFile) && file_exists($sourceJsFile)) {
-        copy($sourceJsFile, $destJsFile);
+    // Define possible locations for OpenSeadragon files
+    $possibleJsSources = [
+        __DIR__ . '/../../www/js/openseadragon.min.js',
+        __DIR__ . '/../../templates/js/openseadragon.min.js'
+    ];
+    
+    // Try to find OpenSeadragon JS file
+    $sourceJsFile = null;
+    foreach ($possibleJsSources as $path) {
+        if (file_exists($path)) {
+            $sourceJsFile = $path;
+            break;
+        }
     }
     
-    // Copy all necessary image files
-    $sourceImagesDir = __DIR__ . '/../../www/js/images';
-    if (is_dir($sourceImagesDir)) {
+    // Copy the JS file if found
+    $destJsFile = $jsDir . '/openseadragon.min.js';
+    if ($sourceJsFile && !file_exists($destJsFile)) {
+        copy($sourceJsFile, $destJsFile);
+    } else if (!$sourceJsFile) {
+        // Log error and try to download directly
+        error_log("Error: OpenSeadragon JS file not found at any of the expected locations. Attempting to download directly.");
+        
+        // Attempt to download directly from CDN
+        $osJsContent = @file_get_contents('https://cdn.jsdelivr.net/npm/openseadragon@3.0.0/build/openseadragon/openseadragon.min.js');
+        if ($osJsContent !== false) {
+            file_put_contents($destJsFile, $osJsContent);
+            error_log("Successfully downloaded OpenSeadragon JS directly from CDN.");
+        } else {
+            error_log("Failed to download OpenSeadragon JS from CDN.");
+        }
+    }
+    
+    // Define possible locations for image files
+    $possibleImageDirs = [
+        __DIR__ . '/../../www/js/images',
+        __DIR__ . '/../../templates/js/images'
+    ];
+    
+    // Try to find images directory
+    $sourceImagesDir = null;
+    foreach ($possibleImageDirs as $path) {
+        if (is_dir($path)) {
+            $sourceImagesDir = $path;
+            break;
+        }
+    }
+    
+    // Copy image files or download them if needed
+    $basicImages = ['home.png', 'fullpage.png', 'zoomin.png', 'zoomout.png'];
+    if ($sourceImagesDir) {
         $imageFiles = scandir($sourceImagesDir);
         foreach ($imageFiles as $imageFile) {
             if ($imageFile != '.' && $imageFile != '..') {
@@ -113,16 +154,34 @@ function ensureOpenSeadragonAvailable($outputDir) {
             }
         }
     } else {
-        // Copy basic required images if source directory doesn't exist
-        $imageFiles = ['home.png', 'fullpage.png', 'zoomin.png', 'zoomout.png'];
-        foreach ($imageFiles as $imageFile) {
-            $sourceImageFile = __DIR__ . '/../../www/js/images/' . $imageFile;
+        // Download basic images if source directory doesn't exist
+        error_log("Warning: Could not find OpenSeadragon images directory. Downloading images from GitHub.");
+        
+        foreach ($basicImages as $imageFile) {
             $destImageFile = $imagesDir . '/' . $imageFile;
-            if (!file_exists($destImageFile) && file_exists($sourceImageFile)) {
-                copy($sourceImageFile, $destImageFile);
+            if (!file_exists($destImageFile)) {
+                $imageUrl = "https://raw.githubusercontent.com/openseadragon/openseadragon/master/images/$imageFile";
+                $imageContent = @file_get_contents($imageUrl);
+                if ($imageContent !== false) {
+                    file_put_contents($destImageFile, $imageContent);
+                    error_log("Downloaded image: $imageFile");
+                } else {
+                    error_log("Failed to download image: $imageFile");
+                }
             }
         }
     }
+    
+    // Check if OpenSeadragon JS is now available
+    if (file_exists($destJsFile)) {
+        error_log("OpenSeadragon JS is available at: $destJsFile");
+    } else {
+        error_log("ERROR: Failed to provide OpenSeadragon JS");
+    }
+    
+    // Check if images are available
+    $availableImages = glob($imagesDir . '/*.png');
+    error_log(count($availableImages) . " OpenSeadragon image files available in $imagesDir");
 }
 
 /**
