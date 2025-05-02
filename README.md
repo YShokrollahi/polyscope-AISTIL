@@ -9,7 +9,7 @@ AI-Polyscope is a lightweight web-based viewer for large pathology slides with A
 - Create synchronized multi-view displays of multiple slides  
 - Simple web-based dashboard  
 - Command-line processing support  
-- Compatible with SVS, TIFF, NDPI, and other common pathology slide formats update docker files needed as a module
+- Compatible with SVS, TIFF, NDPI, and other common pathology slide formats update docker files
 
 ## Requirements
 

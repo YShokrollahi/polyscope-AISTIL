@@ -3,8 +3,8 @@
 
 # Check if input parameters are provided
 if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 <input_folder> <output_dir> [multizoom_title]"
-    exit 1
+  echo "Usage: $0 <input_folder> <output_dir> [multizoom_title]"
+  exit 1
 fi
 
 INPUT_FOLDER="$1"
@@ -13,12 +13,22 @@ MULTIZOOM_TITLE="${3:-Multi-Zoom View}"
 
 # Check if input folder exists
 if [ ! -d "$INPUT_FOLDER" ]; then
-    echo "Error: Input folder '$INPUT_FOLDER' does not exist."
-    exit 1
+  echo "Error: Input folder '$INPUT_FOLDER' does not exist."
+  exit 1
 fi
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
+
+# Get basename of input folder for creating expected directory structure
+BASENAME=$(basename "$INPUT_FOLDER")
+SVS_BASENAME="${BASENAME%.svs}"
+
+# Create expected subdirectory structure if it doesn't exist
+if [ ! -d "$INPUT_FOLDER/$SVS_BASENAME" ]; then
+  echo "Creating expected subdirectory: $INPUT_FOLDER/$SVS_BASENAME"
+  mkdir -p "$INPUT_FOLDER/$SVS_BASENAME"
+fi
 
 # Move to the root directory of the application
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

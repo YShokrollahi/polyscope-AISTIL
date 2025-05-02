@@ -130,9 +130,9 @@ run_polyscope() {
   echo ""
   echo "✅ Polyscope processing complete"
   
-  # Check if multizoom was created
-  if [ -f "$output_dir/multizoom/index.html" ]; then
-    echo "🔗 Results available at: $output_dir/multizoom/index.html"
+  # Check if multizoom was created (correct path with slide_name subdirectory)
+  if [ -f "$output_dir/$slide_name/multizoom/index.html" ]; then
+    echo "🔗 Results available at: $output_dir/$slide_name/multizoom/index.html"
   else
     echo "⚠️ Multizoom view not found. Check individual slide viewers at: $output_dir"
   fi
@@ -140,7 +140,7 @@ run_polyscope() {
   echo ""
   echo "You can view the results by starting a web server in the output directory:"
   echo "cd $output_dir && python -m http.server 8000"
-  echo "Then open a browser and navigate to: http://localhost:8000/multizoom/index.html"
+  echo "Then open a browser and navigate to: http://localhost:8000/$slide_name/multizoom/index.html"
   echo ""
 }
 
