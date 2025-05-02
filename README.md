@@ -1,6 +1,6 @@
 # Polyscope-AISTIL
 
-AI-Polyscope is a lightweight web-based viewer for large pathology slides with AI annotations and segmentation overlays. It converts slides to Deep Zoom Image (DZI) format and provides synchronizable multi-view capabilities.
+AI-Polyscope latet version
 
 ## Features
 
