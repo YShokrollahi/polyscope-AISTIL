@@ -83,6 +83,17 @@ docker run --rm -p 8000:80 \
   web
 ```
 
+'''bash
+
+# Fix the multizoom directory
+sudo chmod o+rx /rsrch9/home/plm/idso_fa1_pathology/TIER1/aitil_clia/aistil-web/aistil-polyscope/441878a4-2dfd-b4a3-e7ad-6f04db57588a_145944/multizoom
+
+# Also fix all files and subdirectories inside multizoom
+sudo find /rsrch9/home/plm/idso_fa1_pathology/TIER1/aitil_clia/aistil-web/aistil-polyscope/441878a4-2dfd-b4a3-e7ad-6f04db57588a_145944/multizoom -type d -exec chmod o+rx {} \;
+sudo find /rsrch9/home/plm/idso_fa1_pathology/TIER1/aitil_clia/aistil-web/aistil-polyscope/441878a4-2dfd-b4a3-e7ad-6f04db57588a_145944/multizoom -type f -exec chmod o+r {} \;
+
+'''
+
 Then access the web interface at `http://localhost:8000/`
 
 ## Process a group of slides (raw, classification, TME seg, QC) and create multi-zoom view
