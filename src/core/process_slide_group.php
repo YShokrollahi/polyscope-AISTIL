@@ -207,9 +207,10 @@ function processSlideGroup($inputFolder, $outputDir, $options = []) {
     }
     
     // Process each file
+    // Process each file
     $dziFiles = [];
     $processedFiles = [];
-    
+
     foreach ($filesToProcess as $fileInfo) {
         $filePath = $fileInfo['path'];
         $fileTitle = $fileInfo['title'];
@@ -239,6 +240,31 @@ function processSlideGroup($inputFolder, $outputDir, $options = []) {
         }
         
         $result = convertToDZI($filePath, $workingDir, $convertOptions);
+        
+        // Get base filename for checking DZI existence
+        $baseFilename = pathinfo(basename($filePath), PATHINFO_FILENAME);
+        $possibleDziPath = "$workingDir/$baseFilename/$baseFilename.dzi";
+        $possibleDeepZoomDziPath = "$workingDir/$baseFilename/{$baseFilename}_deepzoom.dzi";
+        
+        // Check if DZI files actually exist despite reported error
+        if ($result['status'] === 'error' && 
+            (file_exists($possibleDziPath) || file_exists($possibleDeepZoomDziPath))) {
+            
+            // DZI file exists despite error, so consider it a success
+            $actualDziPath = file_exists($possibleDeepZoomDziPath) ? 
+                $possibleDeepZoomDziPath : $possibleDziPath;
+            
+            file_put_contents($logFile, "DZI file exists despite reported error: $actualDziPath\n", FILE_APPEND);
+            file_put_contents($debugLog, "DZI file exists despite reported error: $actualDziPath\n", FILE_APPEND);
+            
+            // Create a corrected result
+            $result = [
+                'status' => 'success',
+                'dziPath' => $actualDziPath,
+                'viewerPath' => "$workingDir/$baseFilename/$baseFilename.html",
+                'corrected' => true
+            ];
+        }
         
         if ($result['status'] === 'success') {
             $dziFiles[] = $result['dziPath'];
