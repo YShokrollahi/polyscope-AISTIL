@@ -113,12 +113,12 @@ function processSlideGroup($inputFolder, $outputDir, $options = []) {
     $auxiliaryFiles = [
         // Format: ["prefix_basename_suffix", "prefix_basename.svs_suffix"]
         'classification' => [
-            "${svsBaseName}_classification_stitched.tif",
-            "${svsBaseName}.svs_classification_stitched.tif"
+            "${svsBaseName}_classification_qc_stitched.tif",
+            "${svsBaseName}.svs_classification_qc_stitched.tif"
         ],
         'tme' => [
-            "${svsBaseName}_Ss1.png",
-            "${svsBaseName}.svs_Ss1.png"
+            "${svsBaseName}_no_artifact_Ss1.png",
+            "${svsBaseName}.svs_no_artifact_Ss1.png"
         ],
         'qc' => [
             "${svsBaseName}_map_QC.png",
