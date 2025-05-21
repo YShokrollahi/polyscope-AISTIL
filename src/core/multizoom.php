@@ -290,28 +290,23 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
             // Check the viewer name to determine which legend to show
             $viewerName = strtolower($viewer['name']);
             
-            if (strpos($viewerName, 'qc') !== false || strpos($viewerName, 'map_qc') !== false) {
+            // Make stricter checks for classification
+            // Replace the entire legend assignment section with this position-based logic
+            if ($index === 0) {
+                // Top left viewer (raw image) - no legend
+                $shouldShowLegend = false;
+            } elseif ($index === 1) {
+                // Top right viewer - QC Mask
                 $legendHTML = $qcMaskLegendHTML;
-            } 
-            elseif (strpos($viewerName, 'classification') !== false) {
-                $legendHTML = $cellClassLegendHTML;
-            } 
-            elseif (strpos($viewerName, 'tmeseg') !== false || 
-                   strpos($viewerName, 'mask') !== false ||
-                   strpos($viewerName, 'ss1') !== false) {
+            } elseif ($index === 2) {
+                // Bottom left viewer - TMESeg
                 $legendHTML = $tmesegMaskLegendHTML;
-            }
-            else {
-                // If no specific match, make a best guess based on position
-                if ($index == 1) {
-                    $legendHTML = $qcMaskLegendHTML;
-                } elseif ($index == 2) {
-                    $legendHTML = $tmesegMaskLegendHTML;
-                } elseif ($index == 3) {
-                    $legendHTML = $cellClassLegendHTML;
-                } else {
-                    $shouldShowLegend = false; // If can't determine, don't show a legend
-                }
+            } elseif ($index === 3) {
+                // Bottom right viewer - Cell Classification
+                $legendHTML = $cellClassLegendHTML;
+            } else {
+                // Any other viewers - no legend
+                $shouldShowLegend = false;
             }
         }
         
@@ -320,7 +315,6 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
         
         $viewersHTML .= "
         <div class=\"viewer-container" . (!$shouldShowLegend ? " no-legend" : "") . "\">
-            <div class=\"viewer-title\">{$viewer['name']}</div>
             <div id=\"{$viewer['id']}\" class=\"viewer\"></div>
             {$legendContainer}
         </div>";
@@ -440,7 +434,7 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
             overflow: hidden;
         }
         .legend {
-            font-size: 11px;
+            font-size: 16px;
         }
         .legend-title {
             font-weight: bold;

@@ -109,7 +109,7 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
     }
     
     // For classification_stitched files, check if ImageMagick is installed
-    $isClassificationFile = (strpos($filename, 'classification_stitched') !== false);
+    $isClassificationFile = (strpos($filename, 'classification_qc_stitched') !== false);
     
     // Special handling for different file types
     $vipsCommand = "";
@@ -122,7 +122,7 @@ function convertToDZI($inputFile, $outputDir, $options = []) {
         
         // Special handling for classification stitched files
         if ($isClassificationFile) {
-            file_put_contents($logFile, "Detected classification_stitched file\n", FILE_APPEND);
+            file_put_contents($logFile, "Detected classification_qc_stitched file\n", FILE_APPEND);
             
             // Try using direct ImageMagick convert first (bypassing the size limit issue)
             $tempPngFile = "$workingDir/{$baseFilename}_direct.png";

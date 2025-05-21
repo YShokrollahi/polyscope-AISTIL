@@ -88,13 +88,13 @@ if [ "$MODE" = "process" ]; then
   )
   
   TME_PATTERNS=(
-    "${SVS_BASENAME}_Ss1.png"
-    "${SVS_BASENAME}.svs_Ss1.png"
+    "${SVS_BASENAME}_no_artifact_Ss1.png"
+    "${SVS_BASENAME}.svs_no_artifact_Ss1.png"
   )
   
   CLASS_PATTERNS=(
-    "${SVS_BASENAME}_classification_stitched.tif"
-    "${SVS_BASENAME}.svs_classification_stitched.tif"
+    "${SVS_BASENAME}_classification_qc_stitched.tif"
+    "${SVS_BASENAME}.svs_classification_qc_stitched.tif"
   )
   
   # Find all relevant files

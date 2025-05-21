@@ -311,7 +311,7 @@ def test_tiff_conversion(file_path, output_dir=None):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python test.py input/pilot_image_A.svs/4_5_stitch_output_segformer/pilot_image_A.svs_classification_stitched.tif")
+        print("Usage: python test.py input/pilot_image_A_AT2_20x_Rescan.svs/4_5_stitch_output_segformer/pilot_image_A_AT2_20x_Rescan.svs_classification_qc_stitched.tif")
         sys.exit(1)
     
     tiff_path = sys.argv[1]
