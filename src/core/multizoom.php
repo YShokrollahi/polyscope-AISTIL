@@ -92,16 +92,57 @@ function ensureOpenSeadragonAvailable($outputDir) {
         mkdir($imagesDir, 0755, true);
     }
     
-    // Copy OpenSeadragon JS if it doesn't exist
-    $sourceJsFile = __DIR__ . '/../../www/js/openseadragon.min.js';
-    $destJsFile = $jsDir . '/openseadragon.min.js';
-    if (!file_exists($destJsFile) && file_exists($sourceJsFile)) {
-        copy($sourceJsFile, $destJsFile);
+    // Define possible locations for OpenSeadragon files
+    $possibleJsSources = [
+        __DIR__ . '/../../www/js/openseadragon.min.js',
+        __DIR__ . '/../../templates/js/openseadragon.min.js'
+    ];
+    
+    // Try to find OpenSeadragon JS file
+    $sourceJsFile = null;
+    foreach ($possibleJsSources as $path) {
+        if (file_exists($path)) {
+            $sourceJsFile = $path;
+            break;
+        }
     }
     
-    // Copy all necessary image files
-    $sourceImagesDir = __DIR__ . '/../../www/js/images';
-    if (is_dir($sourceImagesDir)) {
+    // Copy the JS file if found
+    $destJsFile = $jsDir . '/openseadragon.min.js';
+    if ($sourceJsFile && !file_exists($destJsFile)) {
+        copy($sourceJsFile, $destJsFile);
+    } else if (!$sourceJsFile) {
+        // Log error and try to download directly
+        error_log("Error: OpenSeadragon JS file not found at any of the expected locations. Attempting to download directly.");
+        
+        // Attempt to download directly from CDN
+        $osJsContent = @file_get_contents('https://cdn.jsdelivr.net/npm/openseadragon@3.0.0/build/openseadragon/openseadragon.min.js');
+        if ($osJsContent !== false) {
+            file_put_contents($destJsFile, $osJsContent);
+            error_log("Successfully downloaded OpenSeadragon JS directly from CDN.");
+        } else {
+            error_log("Failed to download OpenSeadragon JS from CDN.");
+        }
+    }
+    
+    // Define possible locations for image files
+    $possibleImageDirs = [
+        __DIR__ . '/../../www/js/images',
+        __DIR__ . '/../../templates/js/images'
+    ];
+    
+    // Try to find images directory
+    $sourceImagesDir = null;
+    foreach ($possibleImageDirs as $path) {
+        if (is_dir($path)) {
+            $sourceImagesDir = $path;
+            break;
+        }
+    }
+    
+    // Copy image files or download them if needed
+    $basicImages = ['home.png', 'fullpage.png', 'zoomin.png', 'zoomout.png'];
+    if ($sourceImagesDir) {
         $imageFiles = scandir($sourceImagesDir);
         foreach ($imageFiles as $imageFile) {
             if ($imageFile != '.' && $imageFile != '..') {
@@ -113,16 +154,76 @@ function ensureOpenSeadragonAvailable($outputDir) {
             }
         }
     } else {
-        // Copy basic required images if source directory doesn't exist
-        $imageFiles = ['home.png', 'fullpage.png', 'zoomin.png', 'zoomout.png'];
-        foreach ($imageFiles as $imageFile) {
-            $sourceImageFile = __DIR__ . '/../../www/js/images/' . $imageFile;
+        // Download basic images if source directory doesn't exist
+        error_log("Warning: Could not find OpenSeadragon images directory. Downloading images from GitHub.");
+        
+        foreach ($basicImages as $imageFile) {
             $destImageFile = $imagesDir . '/' . $imageFile;
-            if (!file_exists($destImageFile) && file_exists($sourceImageFile)) {
-                copy($sourceImageFile, $destImageFile);
+            if (!file_exists($destImageFile)) {
+                $imageUrl = "https://raw.githubusercontent.com/openseadragon/openseadragon/master/images/$imageFile";
+                $imageContent = @file_get_contents($imageUrl);
+                if ($imageContent !== false) {
+                    file_put_contents($destImageFile, $imageContent);
+                    error_log("Downloaded image: $imageFile");
+                } else {
+                    error_log("Failed to download image: $imageFile");
+                }
             }
         }
     }
+    
+    // Create a CSS file for custom OpenSeadragon styles
+    $cssContent = <<<CSS
+/* Custom OpenSeadragon controls */
+.openseadragon-container .openseadragon-control {
+    margin: 5px;
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    background-color: rgba(0, 0, 0, 0.6) !important;
+    border: 2px solid #fff !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: background-color 0.2s !important;
+}
+
+.openseadragon-container .openseadragon-control:hover {
+    background-color: rgba(0, 0, 0, 0.8) !important;
+}
+
+.openseadragon-container img.openseadragon-control {
+    padding: 8px !important;
+    box-sizing: border-box !important;
+}
+
+/* Reposition the controls for better spacing */
+.openseadragon-container .navigator-wrapper {
+    margin-right: 10px !important;
+    margin-bottom: 10px !important;
+    border: 2px solid rgba(255, 255, 255, 0.6) !important;
+    border-radius: 5px !important;
+}
+
+.openseadragon-container .navigator {
+    border-radius: 3px !important;
+}
+CSS;
+
+    $cssFile = $jsDir . '/openseadragon-custom.css';
+    file_put_contents($cssFile, $cssContent);
+    
+    // Check if OpenSeadragon JS is now available
+    if (file_exists($destJsFile)) {
+        error_log("OpenSeadragon JS is available at: $destJsFile");
+    } else {
+        error_log("ERROR: Failed to provide OpenSeadragon JS");
+    }
+    
+    // Check if images are available
+    $availableImages = glob($imagesDir . '/*.png');
+    error_log(count($availableImages) . " OpenSeadragon image files available in $imagesDir");
 }
 
 /**
@@ -137,12 +238,85 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
     $viewerCount = count($viewerData);
     $layoutClass = ($viewerCount <= 2) ? 'dual-view' : 'grid-view';
     
+    // Create QC Mask legend HTML
+    $qcMaskLegendHTML = '
+        <div class="legend qc-mask-legend">
+            <div class="legend-title">QC Mask</div>
+            <div class="legend-items">
+                <span class="legend-item"><span class="color-box" style="background-color: #808080;"></span>No Artifact</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #FF6347;"></span>Fold</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #00FF00;"></span>Darkspot</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #FF0000;"></span>Pen</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #FF00FF;"></span>Edge</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #4B0082;"></span>Out of focus</span>
+            </div>
+        </div>';
+    
+    // Create Cell Classification legend HTML
+    $cellClassLegendHTML = '
+        <div class="legend cell-classification-legend">
+            <div class="legend-title">Cell Classification</div>
+            <div class="legend-items">
+                <span class="legend-item"><span class="color-box" style="background-color: #00FF00;"></span>Epithelial</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #0000FF;"></span>Lymphocyte</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #FFFF00;"></span>Fibroblast</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #FFFFFF; border: 1px solid #999;"></span>Other</span>
+            </div>
+        </div>';
+    
+    // Create TMEseg Mask legend HTML
+    $tmesegMaskLegendHTML = '
+        <div class="legend tmeseg-mask-legend">
+            <div class="legend-title">TMEseg Mask</div>
+            <div class="legend-items">
+                <span class="legend-item"><span class="color-box" style="background-color: #FFCC00;"></span>Stroma</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #800000;"></span>Tumor</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #FF00FF;"></span>Necrosis/Hemorrhage</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #808000;"></span>Adipose</span>
+                <span class="legend-item"><span class="color-box" style="background-color: #00FFFF;"></span>Parenchyma</span>
+            </div>
+        </div>';
+    
+    // Determine which legend to use for each viewer based on the name
     $viewersHTML = '';
-    foreach ($viewerData as $viewer) {
+    foreach ($viewerData as $index => $viewer) {
+        $legendHTML = '';
+        $shouldShowLegend = true;
+        
+        // Skip legend for the first (top-left) viewer
+        if ($index === 0) {
+            $shouldShowLegend = false;
+        } else {
+            // Check the viewer name to determine which legend to show
+            $viewerName = strtolower($viewer['name']);
+            
+            // Make stricter checks for classification
+            // Replace the entire legend assignment section with this position-based logic
+            if ($index === 0) {
+                // Top left viewer (raw image) - no legend
+                $shouldShowLegend = false;
+            } elseif ($index === 1) {
+                // Top right viewer - QC Mask
+                $legendHTML = $qcMaskLegendHTML;
+            } elseif ($index === 2) {
+                // Bottom left viewer - TMESeg
+                $legendHTML = $tmesegMaskLegendHTML;
+            } elseif ($index === 3) {
+                // Bottom right viewer - Cell Classification
+                $legendHTML = $cellClassLegendHTML;
+            } else {
+                // Any other viewers - no legend
+                $shouldShowLegend = false;
+            }
+        }
+        
+        $legendContainer = $shouldShowLegend ? 
+            "<div class=\"viewer-legend\">{$legendHTML}</div>" : '';
+        
         $viewersHTML .= "
-        <div class=\"viewer-container\">
-            <div class=\"viewer-title\">{$viewer['name']}</div>
+        <div class=\"viewer-container" . (!$shouldShowLegend ? " no-legend" : "") . "\">
             <div id=\"{$viewer['id']}\" class=\"viewer\"></div>
+            {$legendContainer}
         </div>";
     }
     
@@ -155,6 +329,7 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
 <head>
     <title>$title - AI-Polyscope</title>
     <script src="js/openseadragon.min.js"></script>
+    <link rel="stylesheet" href="js/openseadragon-custom.css">
     <style>
         body {
             margin: 0;
@@ -199,9 +374,14 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
             position: relative;
             border: 1px solid #ccc;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
         }
         .viewer {
+            flex: 1;
             width: 100%;
+        }
+        .viewer-container.no-legend .viewer {
             height: 100%;
         }
         .viewer-title {
@@ -244,6 +424,60 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
             max-height: 300px;
             overflow: auto;
         }
+        
+        /* Viewer Legend Styles */
+        .viewer-legend {
+            background-color: rgba(245, 245, 245, 0.9);
+            border-top: 1px solid #ddd;
+            padding: 5px;
+            height: 40px;
+            overflow: hidden;
+        }
+        .legend {
+            font-size: 16px;
+        }
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            margin-right: 8px;
+        }
+        .color-box {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            margin-right: 3px;
+            border: 1px solid #999;
+        }
+        .toggle-legends {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background-color: rgba(76, 175, 80, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 10px;
+            cursor: pointer;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .toggle-legends:hover {
+            background-color: rgba(76, 175, 80, 1);
+        }
     </style>
 </head>
 <body>
@@ -272,16 +506,57 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
         let syncViews = $syncViewsValue;
         let activeSync = false; // Flag to prevent recursive synchronization
         
+        // Define viewer relationships for synchronization
+        // Each viewer syncs with all other viewers
+        const ViewerRelationships = {};
+        
+        // Build the relationships dynamically based on viewerData
+        viewerData.forEach(viewer => {
+            ViewerRelationships[viewer.id] = viewerData
+                .filter(v => v.id !== viewer.id)
+                .map(v => v.id);
+        });
+        
         // Debug function
         function toggleDebug() {
             const debugEl = document.getElementById('debug-info');
             if (debugEl.style.display === 'none') {
                 debugEl.style.display = 'block';
-                debugEl.innerHTML = 'Viewer Data:<br>' + JSON.stringify(viewerData, null, 2).replace(/\\n/g, '<br>');
+                debugEl.innerHTML = 'Viewer Data:<br>' + JSON.stringify(viewerData, null, 2).replace(/\\n/g, '<br>') + 
+                    '<br><br>ViewerRelationships:<br>' + JSON.stringify(ViewerRelationships, null, 2).replace(/\\n/g, '<br>');
             } else {
                 debugEl.style.display = 'none';
             }
         }
+        
+        // Add toggle buttons for each legend
+        document.querySelectorAll('.viewer-container:not(.no-legend)').forEach(container => {
+            const legend = container.querySelector('.viewer-legend');
+            if (legend) {
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = 'toggle-legends';
+                toggleBtn.innerHTML = '<span style="font-size:14px;">L</span>';
+                toggleBtn.title = 'Toggle Legend';
+                toggleBtn.addEventListener('click', function() {
+                    if (legend.style.display === 'none') {
+                        legend.style.display = 'block';
+                        this.innerHTML = '<span style="font-size:14px;">L</span>';
+                    } else {
+                        legend.style.display = 'none';
+                        this.innerHTML = '<span style="font-size:14px;">L</span>';
+                    }
+                    
+                    // Update viewer after layout change
+                    setTimeout(() => {
+                        const viewerId = container.querySelector('.viewer').id;
+                        if (viewers[viewerId]) {
+                            viewers[viewerId].updateOnResize();
+                        }
+                    }, 100);
+                });
+                container.appendChild(toggleBtn);
+            }
+        });
         
         // Wait for OpenSeadragon to load
         window.addEventListener('load', function() {
@@ -305,7 +580,13 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
                         navigatorPosition: "BOTTOM_RIGHT",
                         visibilityRatio: 1.0,
                         constrainDuringPan: true,
-                        autoResize: true
+                        autoResize: true,
+                        controlsFadeDelay: 1500,    // Delay before controls fade out
+                        controlsFadeLength: 1000,   // Duration of the fade animation
+                        zoomInButton: 'zoomIn',     // Custom button IDs
+                        zoomOutButton: 'zoomOut',   // Custom button IDs
+                        homeButton: 'home',         // Custom button IDs
+                        fullPageButton: 'fullPage'  // Custom button IDs
                     });
                     
                     // Log successful creation
@@ -319,60 +600,77 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
             
             // Add synchronization handlers after all viewers are initialized
             if (syncViews) {
-                setTimeout(setupSyncHandlers, 1000); // Slight delay to ensure all viewers are ready
+                setTimeout(syncAll, 1000); // Slight delay to ensure all viewers are ready
             }
         });
         
-        // Set up synchronization handlers
-        function setupSyncHandlers() {
-            viewerData.forEach(data => {
-                if (viewers[data.id]) {
-                    viewers[data.id].addHandler('pan', function() {
-                        if (syncViews && !activeSync) {
-                            activeSync = true;
-                            syncViewers(data.id, 'pan');
-                            setTimeout(() => { activeSync = false; }, 50);
-                        }
-                    });
-                    
-                    viewers[data.id].addHandler('zoom', function() {
-                        if (syncViews && !activeSync) {
-                            activeSync = true;
-                            syncViewers(data.id, 'zoom');
-                            setTimeout(() => { activeSync = false; }, 50);
-                        }
-                    });
+        // Function to synchronize one viewer to another
+        function syncImage(targetViewer, sourceViewer) {
+            console.log('Syncing ' + targetViewer.element.id + ' with ' + sourceViewer.element.id);
+            
+            // Synchronize pan position
+            const center = sourceViewer.viewport.getCenter();
+            targetViewer.viewport.panTo(center, false);
+            
+            // Synchronize zoom level
+            const zoom = sourceViewer.viewport.getZoom();
+            targetViewer.viewport.zoomTo(zoom, null, false);
+        }
+        
+        // Animation event handler for synchronization
+        function animationHandler(event) {
+            if (!syncViews || activeSync) return;
+            
+            activeSync = true;
+            
+            const sourceViewer = event.eventSource;
+            console.log('Animation event from ' + sourceViewer.element.id);
+            
+            // Get target viewers to sync with this source
+            const targetsToSync = ViewerRelationships[sourceViewer.element.id] || [];
+            
+            // Sync each target viewer
+            targetsToSync.forEach(targetId => {
+                if (viewers[targetId] && viewers[targetId] !== sourceViewer) {
+                    syncImage(viewers[targetId], sourceViewer);
                 }
             });
+            
+            // Release sync lock after a short delay
+            setTimeout(() => { 
+                activeSync = false;
+                console.log('Sync complete, lock released');
+            }, 50);
+        }
+        
+        // Apply synchronization to all viewers
+        function syncAll() {
+            console.log('Setting up synchronization for all viewers');
+            
+            // First remove any existing handlers
+            Object.values(viewers).forEach(viewer => {
+                if (viewer) {
+                    viewer.removeHandler('animation', animationHandler);
+                }
+            });
+            
+            // Then add handlers if sync is enabled
+            if (syncViews) {
+                Object.values(viewers).forEach(viewer => {
+                    if (viewer) {
+                        console.log('Adding animation handler to ' + viewer.element.id);
+                        viewer.addHandler('animation', animationHandler);
+                    }
+                });
+            }
         }
         
         // Sync toggle handler
         document.getElementById('sync-toggle').addEventListener('change', function() {
             syncViews = this.checked;
-            if (syncViews) {
-                setupSyncHandlers();
-            }
+            console.log('Synchronization toggled ' + (syncViews ? 'on' : 'off'));
+            syncAll();
         });
-        
-        // Function to synchronize viewers
-        function syncViewers(sourceId, eventType) {
-            const sourceViewer = viewers[sourceId];
-            if (!sourceViewer) return;
-            
-            Object.keys(viewers).forEach(id => {
-                if (id !== sourceId && viewers[id]) {
-                    const targetViewer = viewers[id];
-                    
-                    if (eventType === 'pan') {
-                        const center = sourceViewer.viewport.getCenter();
-                        targetViewer.viewport.panTo(center, false);
-                    } else if (eventType === 'zoom') {
-                        const zoom = sourceViewer.viewport.getZoom();
-                        targetViewer.viewport.zoomTo(zoom, null, false);
-                    }
-                }
-            });
-        }
         
         // Handle window resize to ensure viewers fit correctly
         window.addEventListener('resize', function() {
