@@ -1,9 +1,5 @@
 # Polyscope-AISTIL
 
-AI-Polyscope latest version
-
-deploy the visulaization on t6
-
 ## Features
 
 - Convert high-resolution pathology slides to DZI format  
@@ -12,7 +8,7 @@ deploy the visulaization on t6
 - Simple web-based dashboard  
 - Command-line processing support  
 - Compatible with SVS, TIFF, NDPI, and other common pathology slide formats
-- Docker support for containerized deployment
+- Docker support for containerized deployment and running
 
 ## Requirements
 
