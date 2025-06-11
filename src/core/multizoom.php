@@ -277,37 +277,34 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
             </div>
         </div>';
     
+    // Create H&E Slide label HTML (simple label without color boxes)
+    $heSlideHTML = '
+        <div class="legend he-slide-legend">
+            <div class="legend-title">H&E Slide</div>
+        </div>';
+    
     // Determine which legend to use for each viewer based on the name
     $viewersHTML = '';
     foreach ($viewerData as $index => $viewer) {
         $legendHTML = '';
         $shouldShowLegend = true;
         
-        // Skip legend for the first (top-left) viewer
+        // Position-based legend assignment
         if ($index === 0) {
-            $shouldShowLegend = false;
+            // Top left viewer (raw image) - H&E Slide label
+            $legendHTML = $heSlideHTML;
+        } elseif ($index === 1) {
+            // Top right viewer - QC Mask
+            $legendHTML = $qcMaskLegendHTML;
+        } elseif ($index === 2) {
+            // Bottom left viewer - TMESeg
+            $legendHTML = $tmesegMaskLegendHTML;
+        } elseif ($index === 3) {
+            // Bottom right viewer - Cell Classification
+            $legendHTML = $cellClassLegendHTML;
         } else {
-            // Check the viewer name to determine which legend to show
-            $viewerName = strtolower($viewer['name']);
-            
-            // Make stricter checks for classification
-            // Replace the entire legend assignment section with this position-based logic
-            if ($index === 0) {
-                // Top left viewer (raw image) - no legend
-                $shouldShowLegend = false;
-            } elseif ($index === 1) {
-                // Top right viewer - QC Mask
-                $legendHTML = $qcMaskLegendHTML;
-            } elseif ($index === 2) {
-                // Bottom left viewer - TMESeg
-                $legendHTML = $tmesegMaskLegendHTML;
-            } elseif ($index === 3) {
-                // Bottom right viewer - Cell Classification
-                $legendHTML = $cellClassLegendHTML;
-            } else {
-                // Any other viewers - no legend
-                $shouldShowLegend = false;
-            }
+            // Any other viewers - no legend
+            $shouldShowLegend = false;
         }
         
         $legendContainer = $shouldShowLegend ? 
@@ -488,8 +485,6 @@ function generateMultizoomHTML($viewerData, $title, $syncViews = true) {
                 <input type="checkbox" id="sync-toggle" checked>
                 <label for="sync-toggle">Synchronize Views</label>
             </div>
-            <a href="../index.php" class="button">Back to Dashboard</a>
-            <button onclick="toggleDebug()" class="button" style="margin-left: 10px;">Debug</button>
         </div>
     </div>
     
