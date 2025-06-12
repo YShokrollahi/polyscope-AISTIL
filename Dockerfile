@@ -1,6 +1,6 @@
 FROM php:8.0-apache
 
-# Install dependencies including libvips with optimizations and ImageMagick
+# Install dependencies including libvips with optimizations, ImageMagick, and transfer tools
 RUN apt-get update && apt-get install -y \
     libvips-dev \
     libvips-tools \
@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y \
     libtiff-tools \
     gdal-bin \
     python3-gdal \
+    rsync \
+    parallel \
+    pv \
     && docker-php-ext-install -j$(nproc) gd zip \
     && pecl install imagick \
     && docker-php-ext-enable imagick \
@@ -57,7 +60,7 @@ RUN if [ ! -f /var/www/html/templates/js/openseadragon.min.js ]; then \
 # Download basic navigation images if they don't exist
 RUN for img in home.png fullpage.png zoomin.png zoomout.png; do \
     if [ ! -f /var/www/html/templates/js/images/$img ]; then \
-    curl -L -o /var/www/html/templates/js/images/$img https://raw.githubusercontent.com/openseadragon/openseadragon/master/images/$img; \
+        curl -L -o /var/www/html/templates/js/images/$img https://raw.githubusercontent.com/openseadragon/openseadragon/master/images/$img; \
     fi; \
     done
 
@@ -90,5 +93,6 @@ echo "max_execution_time = ${PHP_MAX_EXECUTION_TIME}" > /usr/local/etc/php/conf.
 exec docker-entrypoint.sh "$@"
 EOT
 RUN chmod +x /usr/local/bin/docker-php-entrypoint-custom
+
 ENTRYPOINT ["docker-php-entrypoint-custom"]
 CMD ["apache2-foreground"]

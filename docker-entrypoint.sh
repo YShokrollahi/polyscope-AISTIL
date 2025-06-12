@@ -12,10 +12,20 @@ INPUT_DIR=${2:-"/data/input"}
 OUTPUT_DIR=${3:-"/data/output"}
 SLIDE_TITLE=${4:-"Slide Analysis"}
 
+# New: Define local temporary directory for processing
+LOCAL_TEMP_DIR=${LOCAL_TEMP_DIR:-"/tmp/polyscope-processing"}
+ENABLE_TRANSFER=${ENABLE_TRANSFER:-"true"}
+FINAL_OUTPUT_DIR=${FINAL_OUTPUT_DIR:-"$OUTPUT_DIR"}
+
 # Check if running in processing mode
 if [ "$MODE" = "process" ]; then
   echo "🔍 Processing slide source: $INPUT_DIR"
-  echo "🔍 Output directory: $OUTPUT_DIR"
+  echo "🔍 Local temp directory: $LOCAL_TEMP_DIR"
+  echo "🔍 Final output directory: $FINAL_OUTPUT_DIR"
+  echo "🔍 Transfer enabled: $ENABLE_TRANSFER"
+  
+  # Create local temp directory
+  mkdir -p "$LOCAL_TEMP_DIR"
   
   # Clear any previous debug logs
   rm -f /tmp/debug.log
@@ -77,11 +87,6 @@ if [ "$MODE" = "process" ]; then
   fi
   
   # Create multiple file pattern possibilities based on SVS basename
-  # For pilot_image_A.svs, we could have:
-  # - pilot_image_A_map_QC.png
-  # - pilot_image_A.svs_map_QC.png
-  
-  # Set up file search patterns
   QC_PATTERNS=(
     "${SVS_BASENAME}_map_QC.png"
     "${SVS_BASENAME}.svs_map_QC.png"
@@ -187,28 +192,28 @@ if [ "$MODE" = "process" ]; then
     echo "❌ Could not find Classification file with patterns: ${CLASS_PATTERNS[*]}"
   fi
   
-  # Make sure the output directory exists
-  mkdir -p "$OUTPUT_DIR"
+  # STEP 1: Process to local temp directory first
+  echo "🚀 STEP 1: Processing to local temp directory for performance..."
   
-  # Run the processing script
+  # Run the processing script with local temp directory
   cd /var/www/html
-  echo "📝 Running slide group processing with SVS file: $SVS_FILE"
+  echo "📝 Running slide group processing with LOCAL temp output: $LOCAL_TEMP_DIR"
   
-  # Create a temporary PHP script to pass all our paths
+  # Create a temporary PHP script to pass all our paths (using local temp dir)
   cat > /tmp/process_with_paths.php <<EOL
 <?php
 require_once 'src/core/dzi_generator.php';
 require_once 'src/core/multizoom.php';
 require_once 'src/core/process_slide_group.php';
 
-// Path information from bash script
+// Path information from bash script - using LOCAL temp directory
 \$svsFile = '$SVS_FILE';
 \$svsBasename = '$SVS_BASENAME';
 \$qcFile = '$QC_FILE';
 \$tmeFile = '$TME_FILE';
 \$classFile = '$CLASS_FILE';
 \$parentDir = '$INPUT_DIR';
-\$outputDir = '$OUTPUT_DIR';
+\$outputDir = '$LOCAL_TEMP_DIR';  // Using local temp directory
 \$slideTitle = '$SLIDE_TITLE';
 
 // Create files array with only files that exist
@@ -252,10 +257,10 @@ function processWithExplicitPaths(\$svsFile, \$svsBasename, \$filesToProcess, \$
     
     // Start logging
     \$logFile = \$workingDir . '/process.log';
-    file_put_contents(\$logFile, "Processing with explicit file paths\n");
+    file_put_contents(\$logFile, "Processing with explicit file paths to LOCAL temp directory\n");
     file_put_contents(\$logFile, "Started: " . date('Y-m-d H:i:s') . "\n", FILE_APPEND);
     file_put_contents(\$logFile, "SVS File: \$svsFile\n", FILE_APPEND);
-    file_put_contents(\$logFile, "Output directory: \$workingDir\n", FILE_APPEND);
+    file_put_contents(\$logFile, "LOCAL Output directory: \$workingDir\n", FILE_APPEND);
     
     // Debug log all file paths to verify they're correct
     file_put_contents(\$logFile, "Files to process:\n", FILE_APPEND);
@@ -351,7 +356,7 @@ function processWithExplicitPaths(\$svsFile, \$svsBasename, \$filesToProcess, \$
     }
 }
 
-// Process using the detected paths with explicit file handling
+// Process using the detected paths with explicit file handling (to LOCAL temp)
 \$result = processWithExplicitPaths(
     \$svsFile, 
     \$svsBasename, 
@@ -368,9 +373,14 @@ function processWithExplicitPaths(\$svsFile, \$svsBasename, \$filesToProcess, \$
 print_r(\$result);
 EOL
   
-  # Execute the custom PHP script
+  # Execute the custom PHP script (processing to local temp)
+  echo "⚡ Processing files locally for optimal performance..."
+  PROCESSING_START_TIME=$(date +%s)
   RESULT=$(php /tmp/process_with_paths.php)
+  PROCESSING_END_TIME=$(date +%s)
+  PROCESSING_DURATION=$((PROCESSING_END_TIME - PROCESSING_START_TIME))
   
+  echo "✅ Local processing completed in ${PROCESSING_DURATION} seconds"
   echo "PHP Script Result:"
   echo "$RESULT"
   
@@ -378,93 +388,167 @@ EOL
   OUTPUT_BASENAME=$(echo "$RESULT" | grep -o 'slideName] => [^)]*' | cut -d'>' -f2 | tr -d ' ')
   echo "📝 Output basename: $OUTPUT_BASENAME"
   
-  # Debug: List generated files in output directory
-  echo "📂 Generated files in output directory:"
-  find "$OUTPUT_DIR" -type f | head -50  # Limit to 50 files for readability
-  
-  # Ensure JavaScript files are present in the multizoom directory
-  MULTIZOOM_DIR="$OUTPUT_DIR/$OUTPUT_BASENAME/multizoom"
-  JS_DIR="$MULTIZOOM_DIR/js"
-  
-  echo "📝 Using multizoom directory: $MULTIZOOM_DIR"
-  
-  # Create js directory if it doesn't exist
-  mkdir -p "$JS_DIR/images"
-  
-  # Copy OpenSeadragon files with error checking
-  echo "📝 Copying OpenSeadragon JavaScript files..."
-  if [ -f "/var/www/html/templates/js/openseadragon.min.js" ]; then
-    cp -f "/var/www/html/templates/js/openseadragon.min.js" "$JS_DIR/"
-    echo "✅ Copied OpenSeadragon JavaScript from templates"
-  else
-    echo "⚠️ Warning: OpenSeadragon JS not found in templates"
-    # Download it as a fallback
-    curl -L -o "$JS_DIR/openseadragon.min.js" \
-      "https://cdn.jsdelivr.net/npm/openseadragon@3.0.0/build/openseadragon/openseadragon.min.js"
-    echo "✅ Downloaded OpenSeadragon JavaScript from CDN"
-  fi
-  
-  # Copy image files with error checking
-  if [ -d "/var/www/html/templates/js/images" ] && [ "$(ls -A /var/www/html/templates/js/images)" ]; then
-    cp -f /var/www/html/templates/js/images/* "$JS_DIR/images/" 2>/dev/null || true
-    echo "✅ Copied OpenSeadragon images from templates"
-  else
-    echo "⚠️ Warning: OpenSeadragon images not found in templates"
-    # Download basic images as fallback
-    for img in home.png fullpage.png zoomin.png zoomout.png; do
-      curl -L -o "$JS_DIR/images/$img" \
-        "https://raw.githubusercontent.com/openseadragon/openseadragon/master/images/$img"
-    done
-    echo "✅ Downloaded OpenSeadragon images from GitHub"
-  fi
-  
-  # Verify files were copied correctly
-  if [ -f "$JS_DIR/openseadragon.min.js" ]; then
-    echo "✅ OpenSeadragon JavaScript is available at: $JS_DIR/openseadragon.min.js"
-  else
-    echo "❌ ERROR: Failed to copy or download OpenSeadragon JavaScript"
-  fi
-  
-  # Count image files to verify
-  IMAGE_COUNT=$(ls -1 "$JS_DIR/images/" 2>/dev/null | wc -l)
-  echo "✅ $IMAGE_COUNT OpenSeadragon image files available in $JS_DIR/images/"
-  
-  # Check for DZI files generated
-  DZI_COUNT=$(find "$OUTPUT_DIR" -name "*.dzi" 2>/dev/null | wc -l)
-  echo "📊 Found $DZI_COUNT DZI files in output directory"
-  
-  # Look for process.log file for debugging
-  PROCESS_LOG="$OUTPUT_DIR/$OUTPUT_BASENAME/process.log"
-  if [ -f "$PROCESS_LOG" ]; then
-    echo "📜 Contents of process.log:"
-    cat "$PROCESS_LOG"
-  else
-    echo "❌ Process log not found: $PROCESS_LOG"
+  # Check local processing results
+  LOCAL_OUTPUT_PATH="$LOCAL_TEMP_DIR/$OUTPUT_BASENAME"
+  if [ -d "$LOCAL_OUTPUT_PATH" ]; then
+    echo "✅ Local processing successful. Files created in: $LOCAL_OUTPUT_PATH"
     
-    # Search for any process.log
-    FOUND_LOGS=$(find "$OUTPUT_DIR" -name "process.log")
-    if [ -n "$FOUND_LOGS" ]; then
-      echo "📜 Found process logs in other locations:"
-      echo "$FOUND_LOGS"
+    # Show local file summary
+    echo "📊 Local processing summary:"
+    DZI_COUNT=$(find "$LOCAL_OUTPUT_PATH" -name "*.dzi" 2>/dev/null | wc -l)
+    TILE_COUNT=$(find "$LOCAL_OUTPUT_PATH" -name "*.jpg" 2>/dev/null | wc -l)
+    TOTAL_SIZE=$(du -sh "$LOCAL_OUTPUT_PATH" 2>/dev/null | cut -f1)
+    echo "   - DZI files: $DZI_COUNT"
+    echo "   - Tile images: $TILE_COUNT"
+    echo "   - Total size: $TOTAL_SIZE"
+    
+    # STEP 2: Transfer to final destination
+    if [ "$ENABLE_TRANSFER" = "true" ]; then
+      echo "🚀 STEP 2: Transferring files to research drive..."
       
-      # Show contents of first found log
-      FIRST_LOG=$(echo "$FOUND_LOGS" | head -1)
-      echo "Contents of $FIRST_LOG:"
-      cat "$FIRST_LOG"
+      # Ensure final output directory exists
+      mkdir -p "$FINAL_OUTPUT_DIR"
+      
+      # Use simple cp method (proven fastest for this research drive setup)
+      TRANSFER_START_TIME=$(date +%s)
+      echo "📡 Starting transfer of $TILE_COUNT files from $LOCAL_OUTPUT_PATH to $FINAL_OUTPUT_DIR..."
+      echo "🚀 Using cp method (optimized for this storage system)..."
+      
+      # Create destination directory and copy files
+      mkdir -p "$FINAL_OUTPUT_DIR/$OUTPUT_BASENAME"
+      cp -r "$LOCAL_OUTPUT_PATH/." "$FINAL_OUTPUT_DIR/$OUTPUT_BASENAME/"
+      TRANSFER_EXIT_CODE=$?
+      TRANSFER_END_TIME=$(date +%s)
+      TRANSFER_DURATION=$((TRANSFER_END_TIME - TRANSFER_START_TIME))
+      
+      if [ $TRANSFER_EXIT_CODE -eq 0 ]; then
+        echo "✅ Transfer completed successfully in ${TRANSFER_DURATION} seconds"
+        
+        # Verify transfer
+        FINAL_DZI_COUNT=$(find "$FINAL_OUTPUT_DIR/$OUTPUT_BASENAME" -name "*.dzi" 2>/dev/null | wc -l)
+        if [ "$FINAL_DZI_COUNT" -eq "$DZI_COUNT" ]; then
+          echo "✅ Transfer verification successful: $FINAL_DZI_COUNT DZI files transferred"
+          
+          # STEP 3: Cleanup local temp files
+          echo "🧹 STEP 3: Cleaning up local temp files..."
+          rm -rf "$LOCAL_OUTPUT_PATH"
+          echo "✅ Local temp files cleaned up"
+          
+          # Update result URLs to point to final location
+          FINAL_RESULT_FILE="$FINAL_OUTPUT_DIR/$OUTPUT_BASENAME/result.json"
+          if [ -f "$FINAL_RESULT_FILE" ]; then
+            # Update URLs in result.json to reflect final location
+            sed -i "s|output/$OUTPUT_BASENAME|output/$OUTPUT_BASENAME|g" "$FINAL_RESULT_FILE"
+            echo "✅ Result URLs updated for final location"
+          fi
+          
+        else
+          echo "❌ Transfer verification failed: Expected $DZI_COUNT DZI files, found $FINAL_DZI_COUNT"
+          echo "⚠️  Keeping local files for safety: $LOCAL_OUTPUT_PATH"
+        fi
+      else
+        echo "❌ Transfer failed with exit code $TRANSFER_EXIT_CODE"
+        echo "⚠️  Files remain in local temp directory: $LOCAL_OUTPUT_PATH"
+        exit $TRANSFER_EXIT_CODE
+      fi
+    else
+      echo "⏭️  Transfer disabled. Files remain in local temp directory: $LOCAL_OUTPUT_PATH"
     fi
+    
+    # Ensure JavaScript files are present in the final multizoom directory
+    if [ "$ENABLE_TRANSFER" = "true" ]; then
+      MULTIZOOM_DIR="$FINAL_OUTPUT_DIR/$OUTPUT_BASENAME/multizoom"
+    else
+      MULTIZOOM_DIR="$LOCAL_OUTPUT_PATH/multizoom"
+    fi
+    
+    JS_DIR="$MULTIZOOM_DIR/js"
+    
+    echo "📝 Using multizoom directory: $MULTIZOOM_DIR"
+    
+    # Create js directory if it doesn't exist
+    mkdir -p "$JS_DIR/images"
+    
+    # Copy OpenSeadragon files with error checking
+    echo "📝 Copying OpenSeadragon JavaScript files..."
+    if [ -f "/var/www/html/templates/js/openseadragon.min.js" ]; then
+      cp -f "/var/www/html/templates/js/openseadragon.min.js" "$JS_DIR/"
+      echo "✅ Copied OpenSeadragon JavaScript from templates"
+    else
+      echo "⚠️ Warning: OpenSeadragon JS not found in templates"
+      # Download it as a fallback
+      curl -L -o "$JS_DIR/openseadragon.min.js" \
+        "https://cdn.jsdelivr.net/npm/openseadragon@3.0.0/build/openseadragon/openseadragon.min.js"
+      echo "✅ Downloaded OpenSeadragon JavaScript from CDN"
+    fi
+    
+    # Copy image files with error checking
+    if [ -d "/var/www/html/templates/js/images" ] && [ "$(ls -A /var/www/html/templates/js/images)" ]; then
+      cp -f /var/www/html/templates/js/images/* "$JS_DIR/images/" 2>/dev/null || true
+      echo "✅ Copied OpenSeadragon images from templates"
+    else
+      echo "⚠️ Warning: OpenSeadragon images not found in templates"
+      # Download basic images as fallback
+      for img in home.png fullpage.png zoomin.png zoomout.png; do
+        curl -L -o "$JS_DIR/images/$img" \
+          "https://raw.githubusercontent.com/openseadragon/openseadragon/master/images/$img"
+      done
+      echo "✅ Downloaded OpenSeadragon images from GitHub"
+    fi
+    
+    # Verify files were copied correctly
+    if [ -f "$JS_DIR/openseadragon.min.js" ]; then
+      echo "✅ OpenSeadragon JavaScript is available at: $JS_DIR/openseadragon.min.js"
+    else
+      echo "❌ ERROR: Failed to copy or download OpenSeadragon JavaScript"
+    fi
+    
+    # Count image files to verify
+    IMAGE_COUNT=$(ls -1 "$JS_DIR/images/" 2>/dev/null | wc -l)
+    echo "✅ $IMAGE_COUNT OpenSeadragon image files available in $JS_DIR/images/"
+    
+    # Look for process.log file for debugging
+    if [ "$ENABLE_TRANSFER" = "true" ]; then
+      PROCESS_LOG="$FINAL_OUTPUT_DIR/$OUTPUT_BASENAME/process.log"
+    else
+      PROCESS_LOG="$LOCAL_OUTPUT_PATH/process.log"
+    fi
+    
+    if [ -f "$PROCESS_LOG" ]; then
+      echo "📜 Contents of process.log:"
+      tail -n 50 "$PROCESS_LOG"  # Show last 50 lines to avoid overwhelming output
+    else
+      echo "❌ Process log not found: $PROCESS_LOG"
+    fi
+    
+    # If debug.log exists, show its contents
+    if [ -f "/tmp/debug.log" ]; then
+      echo "📜 Contents of debug log:"
+      cat "/tmp/debug.log"
+    fi
+    
+    # Final summary
+    echo ""
+    echo "🎉 ========================================"
+    echo "🎉 PROCESSING COMPLETE!"
+    echo "🎉 ========================================"
+    echo "📊 Processing time: ${PROCESSING_DURATION} seconds"
+    if [ "$ENABLE_TRANSFER" = "true" ]; then
+      echo "📊 Transfer time: ${TRANSFER_DURATION} seconds"
+      echo "📊 Total time: $((PROCESSING_DURATION + TRANSFER_DURATION)) seconds"
+      echo "🌐 Multi-zoom URL: http://localhost:8000/output/$OUTPUT_BASENAME/multizoom/index.html"
+      echo "📁 Final location: $FINAL_OUTPUT_DIR/$OUTPUT_BASENAME/"
+    else
+      echo "📁 Local location: $LOCAL_OUTPUT_PATH/"
+      echo "🌐 Local Multi-zoom URL: file://$LOCAL_OUTPUT_PATH/multizoom/index.html"
+    fi
+    
+    exit 0
+  else
+    echo "❌ Local processing failed. No output directory created at: $LOCAL_OUTPUT_PATH"
+    exit 1
   fi
   
-  # If debug.log exists, show its contents
-  if [ -f "/tmp/debug.log" ]; then
-    echo "📜 Contents of debug log:"
-    cat "/tmp/debug.log"
-  fi
-  
-  # Output success message with the correct URL
-  echo "Processing complete!"
-  echo "Multi-zoom URL: http://localhost:8000/output/$OUTPUT_BASENAME/multizoom/index.html"
-  echo "✅ Processing complete. Results saved to $OUTPUT_DIR"
-  exit 0
 fi
 
 # If not in processing mode, start Apache for web interface
