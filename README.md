@@ -98,11 +98,31 @@ polyscope-AISTIL/
 
 ## Usage
 
-### Running the Web Interface
+### Accessing the Processed Slides
 
-Start the PHP development server:
+1. Navigate to the project directory:
 ```bash
-php -S localhost:8000 -t www/
+cd /rsrch9/home/plm/idso_fa1_pathology/TIER1/aitil_clia/aistil-web/aistil-polyscope
+```
+
+2. Start the PHP server:
+```bash
+php -S 0.0.0.0:8082
+```
+
+3. Access the multi-zoom viewer at:
+```
+http://localhost:8082/output/slide_name/multizoom/index.html
+```
+
+**Note:** If PHP is not installed, install it first:
+```bash
+sudo apt install php-cli
+```
+
+**Alternative using tmux (runs server in background):**
+```bash
+tmux new-session -d -s phpserver 'php -S 0.0.0.0:8082'
 ```
 
 ## Troubleshooting
