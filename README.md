@@ -63,9 +63,29 @@ Replace `/path/to/input` and `/path/to/output` with your actual paths. The slide
 
 ### Accessing the Processed Slides
 
-After processing, you can access the multi-zoom viewer at:
+1. Navigate to the project directory:
+```bash
+cd /rsrch9/home/plm/idso_fa1_pathology/TIER1/aitil_clia/aistil-web/aistil-polyscope
 ```
-http://localhost:8000/output/slide_name/multizoom/index.html
+
+2. Start the PHP server:
+```bash
+php -S 0.0.0.0:8082
+```
+
+3. Access the multi-zoom viewer at:
+```
+http://localhost:8082/output/slide_name/multizoom/index.html
+```
+
+**Note:** If PHP is not installed, install it first:
+```bash
+sudo apt install php-cli
+```
+
+**Alternative using tmux (runs server in background):**
+```bash
+tmux new-session -d -s phpserver 'php -S 0.0.0.0:8082'
 ```
 
 ### Running the Web Interface with Docker
